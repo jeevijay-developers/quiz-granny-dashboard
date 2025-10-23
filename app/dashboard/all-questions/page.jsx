@@ -1,0 +1,390 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Edit, Trash2, Plus, Loader2, Search } from "lucide-react";
+import { getAllQuestions, deleteQuestion } from "@/lib/server";
+import toast from "react-hot-toast";
+import EditQuestionModal from "@/components/dashboard/edit-question-modal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+export default function AllQuestionsPage() {
+  const router = useRouter();
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(null);
+  const [error, setError] = useState(null);
+  const [editingQuestion, setEditingQuestion] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [questionToDelete, setQuestionToDelete] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterDifficulty, setFilterDifficulty] = useState("all");
+
+  useEffect(() => {
+    loadQuestions();
+  }, []);
+
+  const loadQuestions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getAllQuestions();
+      setQuestions(data);
+    } catch (err) {
+      console.error("Error loading questions:", err);
+      setError("Failed to load questions. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      setDeleting(id);
+      await deleteQuestion(id);
+      // Remove from local state
+      setQuestions(questions.filter((q) => q._id !== id));
+      setDeleteDialogOpen(false);
+      setQuestionToDelete(null);
+      toast.success("Question deleted successfully!");
+    } catch (err) {
+      console.error("Error deleting question:", err);
+      toast.error("Failed to delete question. Please try again.");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  // Get unique categories from questions
+  const uniqueCategories = [
+    ...new Set(questions.map((q) => q.category || "General")),
+  ];
+
+  // Filter questions based on search and filters
+  const filteredQuestions = questions.filter((q) => {
+    const matchesSearch =
+      (q.title?.text || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (q.category || "").toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesCategory =
+      filterCategory === "all" || q.category === filterCategory;
+
+    const matchesDifficulty =
+      filterDifficulty === "all" ||
+      q.difficulty?.toString() === filterDifficulty;
+
+    return matchesSearch && matchesCategory && matchesDifficulty;
+  });
+
+  const handleDeleteClick = (question) => {
+    setQuestionToDelete(question);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleEdit = (question) => {
+    setEditingQuestion(question);
+  };
+
+  const handleEditSuccess = async () => {
+    // Reload questions after successful edit
+    await loadQuestions();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">All Questions</h1>
+          <p className="text-muted-foreground mt-1">
+            {filteredQuestions.length} of {questions.length} questions
+          </p>
+        </div>
+        <Link href="/dashboard/questions">
+          <Button className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Create Question
+          </Button>
+        </Link>
+      </div>
+
+      {/* Search and Filters */}
+      <Card className="p-4">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search questions or categories..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="px-4 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="all">All Categories</option>
+            {uniqueCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterDifficulty}
+            onChange={(e) => setFilterDifficulty(e.target.value)}
+            className="px-4 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="all">All Difficulties</option>
+            <option value="1">1 - Very Easy</option>
+            <option value="2">2 - Easy</option>
+            <option value="3">3 - Medium</option>
+            <option value="4">4 - Hard</option>
+            <option value="5">5 - Very Hard</option>
+          </select>
+        </div>
+      </Card>
+
+      {/* Error Message */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
+      {/* Questions Table */}
+      <Card className="overflow-hidden">
+        {filteredQuestions.length === 0 ? (
+          <div className="p-12 text-center">
+            <p className="text-muted-foreground mb-4">
+              {questions.length === 0
+                ? "No questions found. Create your first question to get started."
+                : "No questions match your filters."}
+            </p>
+            <Link href="/dashboard/questions">
+              <Button>Create Question</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted/50 border-b border-border">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
+                    #
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
+                    Question
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
+                    Category
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
+                    Difficulty
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
+                    Options
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
+                    Correct Answer
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
+                    Tags
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
+                    Created
+                  </th>
+                  <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredQuestions.map((question, index) => (
+                  <tr
+                    key={question._id}
+                    className="hover:bg-muted/30 transition-colors"
+                  >
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
+                      {index + 1}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="max-w-md">
+                        <p className="text-sm font-medium text-foreground line-clamp-2">
+                          {question.title?.text || "No title"}
+                        </p>
+                        {question.title?.image && (
+                          <span className="text-xs text-muted-foreground">
+                            📷 Has image
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                        {question.category || "General"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1">
+                        {[...Array(5)].map((_, i) => (
+                          <span
+                            key={i}
+                            className={`text-lg ${
+                              i < (question.difficulty || 1)
+                                ? "text-yellow-500"
+                                : "text-gray-300"
+                            }`}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-muted-foreground">
+                        {question.options?.length || 0} options
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Option {(question.correctAnswer || 0) + 1}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {question.tags?.length > 0 ? (
+                          question.tags.slice(0, 2).map((tag, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {tag}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            No tags
+                          </span>
+                        )}
+                        {question.tags?.length > 2 && (
+                          <span className="text-xs text-muted-foreground">
+                            +{question.tags.length - 2}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(question.createdAt).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(question)}
+                          className="flex items-center gap-1"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteClick(question)}
+                          disabled={deleting === question._id}
+                          className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          {deleting === question._id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                          Delete
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Summary */}
+      {filteredQuestions.length > 0 && (
+        <div className="text-sm text-muted-foreground">
+          Showing {filteredQuestions.length} of {questions.length} question
+          {questions.length !== 1 ? "s" : ""}
+        </div>
+      )}
+
+      {/* Edit Question Modal */}
+      {editingQuestion && (
+        <EditQuestionModal
+          open={!!editingQuestion}
+          onOpenChange={(open) => !open && setEditingQuestion(null)}
+          question={editingQuestion}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              question "{questionToDelete?.title?.text || "this question"}" from
+              the database.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() =>
+                questionToDelete && handleDelete(questionToDelete._id)
+              }
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

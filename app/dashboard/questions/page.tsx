@@ -1,186 +1,457 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Plus, Edit2, Trash2, Search } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import type React from "react";
 
-interface Question {
-  id: number
-  question: string
-  options: string[]
-  correctAnswer: number
-  difficulty: "easy" | "medium" | "hard"
-  category: string
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Plus, Trash2, Upload, X } from "lucide-react";
+import { createQuestion, createQuestionWithFiles } from "@/lib/server";
+import toast from "react-hot-toast";
+
+interface QuestionFormData {
+  question: string;
+  questionImage: File | null;
+  questionImagePreview: string | null;
+  options: Array<{
+    text: string;
+    image: File | null;
+    imagePreview: string | null;
+  }>;
+  correctAnswer: number;
+  difficulty: number;
+  category: string;
 }
 
-export default function ManageQuestionsPage() {
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [filterDifficulty, setFilterDifficulty] = useState<string>("all")
-  const [isLoading, setIsLoading] = useState(true)
+export default function CreateQuestionsPage() {
+  const router = useRouter();
+  const [formData, setFormData] = useState<QuestionFormData>({
+    question: "",
+    questionImage: null,
+    questionImagePreview: null,
+    options: [
+      { text: "", image: null, imagePreview: null },
+      { text: "", image: null, imagePreview: null },
+      { text: "", image: null, imagePreview: null },
+      { text: "", image: null, imagePreview: null },
+    ],
+    correctAnswer: 0,
+    difficulty: 3,
+    category: "General",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    // Load questions from localStorage
-    const stored = localStorage.getItem("questions")
-    if (stored) {
-      setQuestions(JSON.parse(stored))
+  const handleQuestionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setFormData({ ...formData, question: e.target.value });
+  };
+
+  const handleQuestionImageUpload = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFormData({
+          ...formData,
+          questionImage: file,
+          questionImagePreview: event.target?.result as string,
+        });
+      };
+      reader.readAsDataURL(file);
     }
-    setIsLoading(false)
-  }, [])
+  };
 
-  const handleDelete = (id: number) => {
-    if (confirm("Are you sure you want to delete this question?")) {
-      const updated = questions.filter((q) => q.id !== id)
-      setQuestions(updated)
-      localStorage.setItem("questions", JSON.stringify(updated))
+  const handleRemoveQuestionImage = () => {
+    setFormData({
+      ...formData,
+      questionImage: null,
+      questionImagePreview: null,
+    });
+  };
+
+  const handleOptionChange = (index: number, value: string) => {
+    const newOptions = [...formData.options];
+    newOptions[index] = { ...newOptions[index], text: value };
+    setFormData({ ...formData, options: newOptions });
+  };
+
+  const handleOptionImageUpload = (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const newOptions = [...formData.options];
+        newOptions[index] = {
+          ...newOptions[index],
+          image: file,
+          imagePreview: event.target?.result as string,
+        };
+        setFormData({ ...formData, options: newOptions });
+      };
+      reader.readAsDataURL(file);
     }
-  }
+  };
 
-  const filteredQuestions = questions.filter((q) => {
-    const matchesSearch =
-      q.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.category.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesDifficulty = filterDifficulty === "all" || q.difficulty === filterDifficulty
-    return matchesSearch && matchesDifficulty
-  })
+  const handleRemoveOptionImage = (index: number) => {
+    const newOptions = [...formData.options];
+    newOptions[index] = {
+      ...newOptions[index],
+      image: null,
+      imagePreview: null,
+    };
+    setFormData({ ...formData, options: newOptions });
+  };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "easy":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      case "medium":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-      case "hard":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-      default:
-        return "bg-gray-100 text-gray-800"
+  const handleAddOption = () => {
+    setFormData({
+      ...formData,
+      options: [
+        ...formData.options,
+        { text: "", image: null, imagePreview: null },
+      ],
+    });
+  };
+
+  const handleRemoveOption = (index: number) => {
+    if (formData.options.length > 2) {
+      const newOptions = formData.options.filter((_, i) => i !== index);
+      setFormData({
+        ...formData,
+        options: newOptions,
+        correctAnswer:
+          formData.correctAnswer >= newOptions.length
+            ? 0
+            : formData.correctAnswer,
+      });
     }
-  }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    // Validate form
+    if (!formData.question.trim()) {
+      toast.error("Please enter a question");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (formData.options.some((opt) => !opt.text.trim())) {
+      toast.error("Please fill in all options");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!formData.category.trim()) {
+      toast.error("Please select a category");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      // Check if there are any files to upload
+      const hasFiles =
+        formData.questionImage ||
+        formData.options.some((opt) => opt.image !== null);
+
+      if (hasFiles) {
+        // Use FormData for multipart/form-data
+        const formDataToSend = new FormData();
+
+        // Add title text and image
+        formDataToSend.append("titleText", formData.question);
+        if (formData.questionImage) {
+          formDataToSend.append("titleImage", formData.questionImage);
+        }
+
+        // Add options text and images
+        formData.options.forEach((option, index) => {
+          formDataToSend.append(`optionText${index}`, option.text);
+          if (option.image) {
+            formDataToSend.append(`optionImage${index}`, option.image);
+          }
+        });
+
+        // Add other fields
+        formDataToSend.append(
+          "correctAnswer",
+          formData.correctAnswer.toString()
+        );
+        formDataToSend.append("category", formData.category);
+        formDataToSend.append("difficulty", formData.difficulty.toString());
+
+        await createQuestionWithFiles(formDataToSend);
+      } else {
+        // Use JSON for application/json
+        const questionData = {
+          title: {
+            text: formData.question,
+            image: "",
+          },
+          options: formData.options.map((opt) => ({
+            text: opt.text,
+            image: "",
+          })),
+          correctAnswer: formData.correctAnswer,
+          explanation: {
+            text: "",
+            image: "",
+          },
+          tags: [],
+          category: formData.category,
+          difficulty: formData.difficulty,
+        };
+
+        await createQuestion(questionData);
+      }
+
+      toast.success("Question created successfully!");
+
+      // Reset form
+      setFormData({
+        question: "",
+        questionImage: null,
+        questionImagePreview: null,
+        options: [
+          { text: "", image: null, imagePreview: null },
+          { text: "", image: null, imagePreview: null },
+          { text: "", image: null, imagePreview: null },
+          { text: "", image: null, imagePreview: null },
+        ],
+        correctAnswer: 0,
+        difficulty: 3,
+        category: "General",
+      });
+
+      setIsSubmitting(false);
+    } catch (error) {
+      console.error("Error creating question:", error);
+      toast.error("Failed to create question. Please try again.");
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Manage Questions</h1>
-          <p className="text-muted-foreground mt-1">
-            {filteredQuestions.length} question{filteredQuestions.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <Link href="/dashboard/questions/new">
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            New Question
-          </Button>
-        </Link>
+      <div>
+        <h1 className="text-3xl font-bold text-foreground">
+          Create New Question
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Add a new question to your quiz database
+        </p>
       </div>
 
-      {/* Filters */}
-      <Card className="p-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search questions or categories..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+      {/* Form */}
+      <Card className="p-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Question */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Question</label>
+
+            {/* Question Image Preview */}
+            {formData.questionImagePreview && (
+              <div className="mb-3 relative inline-block">
+                <img
+                  src={formData.questionImagePreview}
+                  alt="Question preview"
+                  className="w-32 h-32 rounded object-cover border border-border"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                  onClick={handleRemoveQuestionImage}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <textarea
+                value={formData.question}
+                onChange={handleQuestionChange}
+                placeholder="Enter your question here..."
+                className="flex-1 px-4 py-3 border border-border rounded-lg bg-input text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                rows={4}
               />
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-full gap-2"
+                  onClick={() =>
+                    document.getElementById("question-image")?.click()
+                  }
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload Image
+                </Button>
+                <input
+                  id="question-image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleQuestionImageUpload}
+                  className="hidden"
+                />
+              </div>
             </div>
           </div>
-          <select
-            value={filterDifficulty}
-            onChange={(e) => setFilterDifficulty(e.target.value)}
-            className="px-4 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="all">All Difficulties</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
-        </div>
-      </Card>
 
-      {/* Questions List */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading questions...</p>
+          {/* Category and Difficulty */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium mb-2">Category</label>
+              <Input
+                type="text"
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
+                placeholder="e.g., Science, History, Math"
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Difficulty
+              </label>
+              <select
+                value={formData.difficulty}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    difficulty: parseInt(e.target.value, 10),
+                  })
+                }
+                className="w-full px-4 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="1">1 - Very Easy</option>
+                <option value="2">2 - Easy</option>
+                <option value="3">3 - Medium</option>
+                <option value="4">4 - Hard</option>
+                <option value="5">5 - Very Hard</option>
+              </select>
+            </div>
           </div>
-        </div>
-      ) : filteredQuestions.length === 0 ? (
-        <Card className="p-12 text-center">
-          <p className="text-muted-foreground mb-4">
-            {questions.length === 0
-              ? "No questions yet. Create your first question!"
-              : "No questions match your filters."}
-          </p>
-          {questions.length === 0 && (
-            <Link href="/dashboard/questions/new">
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">Create First Question</Button>
-            </Link>
-          )}
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {filteredQuestions.map((question) => (
-            <Card key={question.id} className="p-6 hover:shadow-md transition-shadow">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyColor(question.difficulty)}`}
-                    >
-                      {question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1)}
-                    </span>
-                    <span className="text-xs text-muted-foreground bg-secondary px-3 py-1 rounded-full">
-                      {question.category}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground mb-3">{question.question}</h3>
-                  <div className="space-y-2">
-                    {question.options.map((option, index) => (
-                      <div
-                        key={index}
-                        className={`p-2 rounded text-sm ${
-                          index === question.correctAnswer
-                            ? "bg-green-100 text-green-900 dark:bg-green-900 dark:text-green-100 font-medium"
-                            : "bg-secondary text-foreground"
-                        }`}
-                      >
-                        {String.fromCharCode(65 + index)}. {option}
-                      </div>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Actions */}
-                <div className="flex gap-2 md:flex-col">
-                  <Link href={`/dashboard/questions/${question.id}/edit`} className="flex-1 md:flex-none">
-                    <Button variant="outline" size="icon" className="w-full md:w-auto bg-transparent">
-                      <Edit2 className="w-4 h-4" />
+          {/* Options */}
+          <div>
+            <label className="block text-sm font-medium mb-4">
+              Answer Options
+            </label>
+            <div className="space-y-3">
+              {formData.options.map((option, index) => (
+                <div key={index} className="space-y-2">
+                  {/* Option Image Preview */}
+                  {option.imagePreview && (
+                    <div className="relative inline-block ml-8">
+                      <img
+                        src={option.imagePreview}
+                        alt={`Option ${index + 1} preview`}
+                        className="w-20 h-20 rounded object-cover border border-border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full"
+                        onClick={() => handleRemoveOptionImage(index)}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="correctAnswer"
+                      checked={formData.correctAnswer === index}
+                      onChange={() =>
+                        setFormData({ ...formData, correctAnswer: index })
+                      }
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                    <Input
+                      type="text"
+                      value={option.text}
+                      onChange={(e) =>
+                        handleOptionChange(index, e.target.value)
+                      }
+                      placeholder={`Option ${index + 1}`}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() =>
+                        document
+                          .getElementById(`option-image-${index}`)
+                          ?.click()
+                      }
+                      title="Upload image"
+                    >
+                      <Upload className="w-4 h-4" />
                     </Button>
-                  </Link>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleDelete(question.id)}
-                    className="flex-1 md:flex-none text-destructive hover:text-destructive bg-transparent"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                    <input
+                      id={`option-image-${index}`}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleOptionImageUpload(index, e)}
+                      className="hidden"
+                    />
+                    {formData.options.length > 2 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleRemoveOption(index)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+              ))}
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleAddOption}
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-transparent"
+            >
+              <Plus className="w-4 h-4" />
+              Add Option
+            </Button>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex gap-3 pt-6 border-t border-border">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              {isSubmitting ? "Creating..." : "Create Question"}
+            </Button>
+          </div>
+        </form>
+      </Card>
     </div>
-  )
+  );
 }

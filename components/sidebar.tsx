@@ -1,29 +1,48 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { useRouter, usePathname } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { LayoutDashboard, HelpCircle, Settings, LogOut, Menu, X } from "lucide-react"
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  LayoutDashboard,
+  HelpCircle,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  List,
+  Plus,
+} from "lucide-react";
+import { HiWrenchScrewdriver } from "react-icons/hi2";
 
 export function Sidebar() {
-  const router = useRouter()
-  const pathname = usePathname()
-  const [isOpen, setIsOpen] = useState(false)
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated")
-    localStorage.removeItem("adminName")
-    router.push("/")
-  }
+    localStorage.removeItem("isAuthenticated");
+    localStorage.removeItem("adminName");
+    router.push("/");
+  };
 
   const navItems = [
     { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-    { href: "/dashboard/questions", label: "Manage Questions", icon: HelpCircle },
+    {
+      href: "/dashboard/questions",
+      label: "Create Questions",
+      icon: Plus,
+    },
+    {
+      href: "/dashboard/all-questions",
+      label: "Manage Questions",
+      icon: HelpCircle,
+    },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
-  ]
+  ];
 
-  const isActive = (href: string) => pathname === href
+  const isActive = (href: string) => pathname === href;
 
   return (
     <>
@@ -44,14 +63,18 @@ export function Sidebar() {
         <div className="p-6 flex flex-col h-full">
           {/* Logo */}
           <div className="mb-8 mt-8 md:mt-0">
-            <h1 className="text-2xl font-bold text-sidebar-primary">Quiz Granny</h1>
-            <p className="text-xs text-sidebar-foreground/60">Admin Dashboard</p>
+            <h1 className="text-2xl font-bold text-sidebar-primary">
+              Quiz Granny
+            </h1>
+            <p className="text-xs text-sidebar-foreground/60">
+              Admin Dashboard
+            </p>
           </div>
 
           {/* Navigation */}
           <nav className="flex-1 space-y-2">
             {navItems.map((item) => {
-              const Icon = item.icon
+              const Icon = item.icon;
               return (
                 <Link key={item.href} href={item.href}>
                   <button
@@ -66,7 +89,7 @@ export function Sidebar() {
                     <span className="font-medium">{item.label}</span>
                   </button>
                 </Link>
-              )
+              );
             })}
           </nav>
 
@@ -83,7 +106,12 @@ export function Sidebar() {
       </aside>
 
       {/* Mobile Overlay */}
-      {isOpen && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setIsOpen(false)} />}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
     </>
-  )
+  );
 }
