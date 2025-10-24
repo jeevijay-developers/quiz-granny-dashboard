@@ -117,7 +117,7 @@ export function Sidebar() {
           <Button
             onClick={() => setShowLogoutDialog(true)}
             variant="outline"
-            className="w-full flex items-center gap-2 justify-center bg-transparent"
+            className="w-full flex items-center gap-2 justify-center bg-transparent hover:bg-gray-800/10"
           >
             <LogOut className="w-4 h-4" />
             Logout
@@ -144,7 +144,9 @@ export function Sidebar() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="hover:bg-gray-800/10">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction onClick={handleLogout}>Logout</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
