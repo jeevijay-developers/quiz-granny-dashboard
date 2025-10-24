@@ -2,13 +2,17 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Plus, Trash2, Upload, X } from "lucide-react";
-import { createQuestion, createQuestionWithFiles } from "@/lib/server";
+import { Plus, Trash2, Upload, X, Check, ChevronDown } from "lucide-react";
+import {
+  createQuestion,
+  createQuestionWithFiles,
+  getAllCategories,
+} from "@/lib/server";
 import toast from "react-hot-toast";
 
 interface QuestionFormData {
@@ -22,7 +26,12 @@ interface QuestionFormData {
   }>;
   correctAnswer: number;
   difficulty: number;
-  category: string;
+  categories: string[];
+}
+
+interface Category {
+  _id: string;
+  name: string;
 }
 
 export default function CreateQuestionsPage() {
@@ -39,9 +48,61 @@ export default function CreateQuestionsPage() {
     ],
     correctAnswer: 0,
     difficulty: 3,
-    category: "General",
+    categories: [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setCategoryDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      const data = await getAllCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error("Error loading categories:", error);
+      toast.error("Failed to load categories");
+    }
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      categories: prev.categories.includes(categoryId)
+        ? prev.categories.filter((id) => id !== categoryId)
+        : [...prev.categories, categoryId],
+    }));
+  };
+
+  const getSelectedCategoryNames = () => {
+    return categories
+      .filter((cat) => formData.categories.includes(cat._id))
+      .map((cat) => cat.name)
+      .join(", ");
+  };
+
+  const filteredCategories = categories.filter((cat) =>
+    cat.name.toLowerCase().includes(categorySearch.toLowerCase())
+  );
 
   const handleQuestionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setFormData({ ...formData, question: e.target.value });
@@ -149,8 +210,8 @@ export default function CreateQuestionsPage() {
       return;
     }
 
-    if (!formData.category.trim()) {
-      toast.error("Please select a category");
+    if (formData.categories.length === 0) {
+      toast.error("Please select at least one category");
       setIsSubmitting(false);
       return;
     }
@@ -184,7 +245,10 @@ export default function CreateQuestionsPage() {
           "correctAnswer",
           formData.correctAnswer.toString()
         );
-        formDataToSend.append("category", formData.category);
+        formDataToSend.append(
+          "categories",
+          JSON.stringify(formData.categories)
+        );
         formDataToSend.append("difficulty", formData.difficulty.toString());
 
         await createQuestionWithFiles(formDataToSend);
@@ -205,7 +269,7 @@ export default function CreateQuestionsPage() {
             image: "",
           },
           tags: [],
-          category: formData.category,
+          categories: formData.categories,
           difficulty: formData.difficulty,
         };
 
@@ -227,7 +291,7 @@ export default function CreateQuestionsPage() {
         ],
         correctAnswer: 0,
         difficulty: 3,
-        category: "General",
+        categories: [],
       });
 
       setIsSubmitting(false);
@@ -289,7 +353,7 @@ export default function CreateQuestionsPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-full gap-2"
+                  className="h-full gap-2 hover:bg-gray-900/10"
                   onClick={() =>
                     document.getElementById("question-image")?.click()
                   }
@@ -311,16 +375,67 @@ export default function CreateQuestionsPage() {
           {/* Category and Difficulty */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium mb-2">Category</label>
-              <Input
-                type="text"
-                value={formData.category}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
-                placeholder="e.g., Science, History, Math"
-                className="w-full"
-              />
+              <label className="block text-sm font-medium mb-2">
+                Categories
+              </label>
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary flex items-center justify-between"
+                >
+                  <span className="text-sm truncate">
+                    {formData.categories.length > 0
+                      ? getSelectedCategoryNames()
+                      : "Select categories..."}
+                  </span>
+                  <ChevronDown className="w-4 h-4 ml-2 shrink-0" />
+                </button>
+
+                {categoryDropdownOpen && (
+                  <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-64 overflow-hidden">
+                    <div className="p-2 border-b border-border">
+                      <Input
+                        type="text"
+                        placeholder="Search categories..."
+                        value={categorySearch}
+                        onChange={(e) => setCategorySearch(e.target.value)}
+                        className="w-full"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      {filteredCategories.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          No categories found
+                        </div>
+                      ) : (
+                        filteredCategories.map((category) => (
+                          <label
+                            key={category._id}
+                            className="flex items-center gap-3 px-4 py-2 hover:bg-accent cursor-pointer"
+                          >
+                            <div className="flex items-center justify-center w-4 h-4 border border-border rounded">
+                              {formData.categories.includes(category._id) && (
+                                <Check className="w-3 h-3 text-primary" />
+                              )}
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={formData.categories.includes(
+                                category._id
+                              )}
+                              onChange={() => toggleCategory(category._id)}
+                              className="sr-only"
+                            />
+                            <span className="text-sm">{category.name}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
@@ -403,6 +518,7 @@ export default function CreateQuestionsPage() {
                           ?.click()
                       }
                       title="Upload image"
+                      className="hover:bg-sidebar-primary/10"
                     >
                       <Upload className="w-4 h-4" />
                     </Button>
@@ -419,7 +535,7 @@ export default function CreateQuestionsPage() {
                         variant="outline"
                         size="icon"
                         onClick={() => handleRemoveOption(index)}
-                        className="text-destructive hover:text-destructive"
+                        className="text-destructive hover:bg-sidebar-primary/10  hover:text-destructive"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -433,7 +549,7 @@ export default function CreateQuestionsPage() {
               type="button"
               variant="outline"
               onClick={handleAddOption}
-              className="mt-4 w-full flex items-center justify-center gap-2 bg-transparent"
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-transparent hover:bg-gray-800/10"
             >
               <Plus className="w-4 h-4" />
               Add Option

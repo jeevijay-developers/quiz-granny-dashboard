@@ -5,6 +5,16 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   LayoutDashboard,
   HelpCircle,
   Settings,
@@ -20,6 +30,7 @@ export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem("isAuthenticated");
@@ -39,7 +50,16 @@ export function Sidebar() {
       label: "Manage Questions",
       icon: HelpCircle,
     },
-    { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    {
+      href: "/dashboard/category/create",
+      label: "Create Category",
+      icon: Plus,
+    },
+    {
+      href: "/dashboard/category/manage",
+      label: "Manage Category",
+      icon: HelpCircle,
+    },
   ];
 
   const isActive = (href: string) => pathname === href;
@@ -72,7 +92,7 @@ export function Sidebar() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-2">
+          <nav className="flex-1 gap-3 flex flex-col mb-8">
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -82,7 +102,7 @@ export function Sidebar() {
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                       isActive(item.href)
                         ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent/20"
+                        : "text-sidebar-foreground hover:bg-sidebar-primary/10"
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -95,7 +115,7 @@ export function Sidebar() {
 
           {/* Logout Button */}
           <Button
-            onClick={handleLogout}
+            onClick={() => setShowLogoutDialog(true)}
             variant="outline"
             className="w-full flex items-center gap-2 justify-center bg-transparent"
           >
@@ -112,6 +132,23 @@ export function Sidebar() {
           onClick={() => setIsOpen(false)}
         />
       )}
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to logout? You will need to login again to
+              access the dashboard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLogout}>Logout</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

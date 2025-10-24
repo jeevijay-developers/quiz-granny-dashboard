@@ -6,8 +6,20 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Edit, Trash2, Plus, Loader2, Search } from "lucide-react";
-import { getAllQuestions, deleteQuestion } from "@/lib/server";
+import {
+  Edit,
+  Trash2,
+  Plus,
+  Loader2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import {
+  getAllQuestions,
+  deleteQuestion,
+  getAllCategories,
+} from "@/lib/server";
 import toast from "react-hot-toast";
 import EditQuestionModal from "@/components/dashboard/edit-question-modal";
 import {
@@ -33,10 +45,28 @@ export default function AllQuestionsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterDifficulty, setFilterDifficulty] = useState("all");
+  const [categories, setCategories] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const questionsPerPage = 20;
 
   useEffect(() => {
     loadQuestions();
+    loadCategories();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const data = await getAllCategories();
+      setCategories(data);
+    } catch (err) {
+      console.error("Error loading categories:", err);
+    }
+  };
+
+  const getCategoryName = (categoryId) => {
+    const category = categories.find((cat) => cat._id === categoryId);
+    return category ? category.name : categoryId;
+  };
 
   const loadQuestions = async () => {
     try {
@@ -71,17 +101,48 @@ export default function AllQuestionsPage() {
 
   // Get unique categories from questions
   const uniqueCategories = [
-    ...new Set(questions.map((q) => q.category || "General")),
-  ];
+    ...new Set(
+      questions.flatMap((q) => {
+        if (q.categories && Array.isArray(q.categories)) {
+          return q.categories.map((catId) => {
+            if (typeof catId === "string") {
+              return getCategoryName(catId);
+            }
+            return catId.name || catId;
+          });
+        }
+        return q.category ? [q.category] : [];
+      })
+    ),
+  ].filter(Boolean);
 
   // Filter questions based on search and filters
   const filteredQuestions = questions.filter((q) => {
     const matchesSearch =
       (q.title?.text || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (q.categories &&
+        Array.isArray(q.categories) &&
+        q.categories.some((catId) => {
+          const catName =
+            typeof catId === "string"
+              ? getCategoryName(catId)
+              : catId.name || catId;
+          return catName?.toLowerCase().includes(searchTerm.toLowerCase());
+        })) ||
       (q.category || "").toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesCategory =
-      filterCategory === "all" || q.category === filterCategory;
+      filterCategory === "all" ||
+      (q.categories &&
+        Array.isArray(q.categories) &&
+        q.categories.some((catId) => {
+          const catName =
+            typeof catId === "string"
+              ? getCategoryName(catId)
+              : catId.name || catId;
+          return catName === filterCategory;
+        })) ||
+      q.category === filterCategory;
 
     const matchesDifficulty =
       filterDifficulty === "all" ||
@@ -89,6 +150,17 @@ export default function AllQuestionsPage() {
 
     return matchesSearch && matchesCategory && matchesDifficulty;
   });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredQuestions.length / questionsPerPage);
+  const startIndex = (currentPage - 1) * questionsPerPage;
+  const endIndex = startIndex + questionsPerPage;
+  const paginatedQuestions = filteredQuestions.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterCategory, filterDifficulty]);
 
   const handleDeleteClick = (question) => {
     setQuestionToDelete(question);
@@ -227,13 +299,13 @@ export default function AllQuestionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredQuestions.map((question, index) => (
+                {paginatedQuestions.map((question, index) => (
                   <tr
                     key={question._id}
                     className="hover:bg-muted/30 transition-colors"
                   >
                     <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {index + 1}
+                      {startIndex + index + 1}
                     </td>
                     <td className="px-6 py-4">
                       <div className="max-w-md">
@@ -248,9 +320,29 @@ export default function AllQuestionsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                        {question.category || "General"}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {question.categories &&
+                        question.categories.length > 0 ? (
+                          question.categories.map((catId, i) => {
+                            const categoryName =
+                              typeof catId === "string"
+                                ? getCategoryName(catId)
+                                : catId.name || catId;
+                            return (
+                              <span
+                                key={i}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
+                              >
+                                {categoryName}
+                              </span>
+                            );
+                          })
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            {question.category || "No category"}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1">
@@ -314,7 +406,7 @@ export default function AllQuestionsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleEdit(question)}
-                          className="flex items-center gap-1"
+                          className="flex items-center gap-1 hover:bg-gray-800/10"
                         >
                           <Edit className="w-3.5 h-3.5" />
                           Edit
@@ -343,8 +435,78 @@ export default function AllQuestionsPage() {
         )}
       </Card>
 
+      {/* Pagination */}
+      {filteredQuestions.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Showing {startIndex + 1} to{" "}
+            {Math.min(endIndex, filteredQuestions.length)} of{" "}
+            {filteredQuestions.length} question
+            {filteredQuestions.length !== 1 ? "s" : ""}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="flex items-center gap-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </Button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                (page) => {
+                  // Show first page, last page, current page, and pages around current
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className="w-10"
+                      >
+                        {page}
+                      </Button>
+                    );
+                  } else if (
+                    page === currentPage - 2 ||
+                    page === currentPage + 2
+                  ) {
+                    return (
+                      <span key={page} className="px-2 text-muted-foreground">
+                        ...
+                      </span>
+                    );
+                  }
+                  return null;
+                }
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage === totalPages}
+              className="flex items-center gap-1"
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Summary */}
-      {filteredQuestions.length > 0 && (
+      {filteredQuestions.length > 0 && totalPages <= 1 && (
         <div className="text-sm text-muted-foreground">
           Showing {filteredQuestions.length} of {questions.length} question
           {questions.length !== 1 ? "s" : ""}
