@@ -30,7 +30,7 @@ export default function BackendHealthCheck({
         attempt++;
         try {
           const response = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/health`,
+            `${process.env.NEXT_PUBLIC_API_BASE_URL}/health`,
             {
               method: "GET",
               signal: AbortSignal.timeout(10000), // 10 second timeout
