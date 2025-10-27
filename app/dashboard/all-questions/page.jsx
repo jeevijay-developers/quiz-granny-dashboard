@@ -288,9 +288,6 @@ export default function AllQuestionsPage() {
                     Correct Answer
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
-                    Tags
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                     Created
                   </th>
                   <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">
@@ -370,29 +367,6 @@ export default function AllQuestionsPage() {
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           Option {(question.correctAnswer || 0) + 1}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {question.tags?.length > 0 ? (
-                          question.tags.slice(0, 2).map((tag, i) => (
-                            <span
-                              key={i}
-                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
-                            >
-                              {tag}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            No tags
-                          </span>
-                        )}
-                        {question.tags?.length > 2 && (
-                          <span className="text-xs text-muted-foreground">
-                            +{question.tags.length - 2}
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">

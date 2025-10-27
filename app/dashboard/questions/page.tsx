@@ -268,7 +268,6 @@ export default function CreateQuestionsPage() {
             text: "",
             image: "",
           },
-          tags: [],
           categories: formData.categories,
           difficulty: formData.difficulty,
         };

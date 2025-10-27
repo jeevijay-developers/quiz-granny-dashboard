@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
 import BackendHealthCheck from "@/components/backend-health-check";
+import { loginUser } from "@/lib/server";
+import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,24 +19,45 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const ADMIN_EMAIL = "admin@quizgranny.com";
-  const ADMIN_PASSWORD = "admin123";
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
 
-    setTimeout(() => {
-      if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+    try {
+      if (!email.trim() || !password.trim()) {
+        setError("Please enter both email and password");
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await loginUser({
+        email: email.trim(),
+        password: password.trim(),
+      });
+
+      if (response.user) {
+        // Store user data in localStorage
         localStorage.setItem("isAuthenticated", "true");
-        localStorage.setItem("adminName", "Admin");
+        localStorage.setItem("adminId", response.user._id);
+        localStorage.setItem("adminName", response.user.username);
+        localStorage.setItem("adminEmail", response.user.email);
+        localStorage.setItem("userRole", response.user.role);
+
+        toast.success("Login successful!");
         router.push("/dashboard");
       } else {
-        setError("Invalid email or password. Please try again.");
+        setError("Invalid response from server");
       }
+    } catch (err: any) {
+      console.error("Login error:", err);
+      const errorMessage =
+        err.response?.data?.error ||
+        "Invalid email or password. Please try again.";
+      setError(errorMessage);
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
   return (
@@ -65,8 +88,8 @@ export default function LoginPage() {
                   Email or Username
                 </label>
                 <Input
-                  type="email"
-                  placeholder="admin@quizgranny.com"
+                  type="text"
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
@@ -97,16 +120,11 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            {/* Demo Credentials */}
+            {/* Info Note */}
             <div className="mt-6 p-4 bg-secondary rounded-lg">
-              <p className="text-xs text-muted-foreground mb-2 font-medium">
-                Demo Credentials:
-              </p>
               <p className="text-xs text-muted-foreground">
-                Email: admin@quizgranny.com
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Password: admin123
+                Login with your credentials to access the Quiz Granny Admin
+                Dashboard
               </p>
             </div>
           </div>

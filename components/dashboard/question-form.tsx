@@ -53,7 +53,6 @@ export default function QuestionForm({
   const [explanationImagePreview, setExplanationImagePreview] = useState(
     initialData?.explanation?.image || null
   );
-  const [tags, setTags] = useState(initialData?.tags?.join(", ") || "");
   const [errors, setErrors] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -169,12 +168,6 @@ export default function QuestionForm({
         if (explanationImage) {
           formData.append("explanationImage", explanationImage);
         }
-
-        // Add tags
-        if (tags.trim()) {
-          formData.append("tags", tags);
-        }
-
         await createQuestionWithFiles(formData);
       } else {
         // Use JSON for text-only
@@ -192,12 +185,6 @@ export default function QuestionForm({
             text: explanation,
             image: "",
           },
-          tags: tags.trim()
-            ? tags
-                .split(",")
-                .map((t: string) => t.trim())
-                .filter(Boolean)
-            : [],
         };
 
         await createQuestion(questionData);
@@ -380,20 +367,6 @@ export default function QuestionForm({
               className="hidden"
             />
           </div>
-        </div>
-
-        {/* Tags (Optional) */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Tags (Optional)
-          </label>
-          <Input
-            type="text"
-            placeholder="mathematics, algebra, equations (comma-separated)"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            className="w-full"
-          />
         </div>
 
         {/* Submit Button */}

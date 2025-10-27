@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -17,50 +17,79 @@ import {
 import {
   LayoutDashboard,
   HelpCircle,
-  Settings,
   LogOut,
   Menu,
   X,
-  List,
   Plus,
+  Users,
 } from "lucide-react";
-import { HiWrenchScrewdriver } from "react-icons/hi2";
 
 export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Get user role from localStorage
+    const role = localStorage.getItem("userRole");
+    setUserRole(role);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("isAuthenticated");
     localStorage.removeItem("adminName");
+    localStorage.removeItem("adminId");
+    localStorage.removeItem("adminEmail");
+    localStorage.removeItem("userRole");
     router.push("/");
   };
 
-  const navItems = [
-    { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  // Define all navigation items with role requirements
+  const allNavItems = [
+    {
+      href: "/dashboard",
+      label: "Overview",
+      icon: LayoutDashboard,
+      roles: ["admin", "user"],
+    },
     {
       href: "/dashboard/questions",
       label: "Create Questions",
       icon: Plus,
+      roles: ["admin", "user"],
     },
     {
       href: "/dashboard/all-questions",
       label: "Manage Questions",
       icon: HelpCircle,
+      roles: ["admin", "user"],
     },
     {
       href: "/dashboard/category/create",
       label: "Create Category",
       icon: Plus,
+      roles: ["admin"],
     },
     {
       href: "/dashboard/category/manage",
       label: "Manage Category",
       icon: HelpCircle,
+      roles: ["admin"],
+    },
+    {
+      href: "/dashboard/users",
+      label: "Users",
+      icon: Users,
+      roles: ["admin"],
     },
   ];
+
+  // Filter navigation items based on user role
+  const navItems = allNavItems.filter(
+    (item) => userRole && item.roles.includes(userRole)
+  );
 
   const isActive = (href: string) => pathname === href;
 
@@ -92,7 +121,7 @@ export function Sidebar() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 gap-3 flex flex-col mb-8">
+          <nav className="flex-1 gap-1 flex flex-col mb-4">
             {navItems.map((item) => {
               const Icon = item.icon;
               return (

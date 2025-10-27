@@ -63,7 +63,6 @@ export default function EditQuestionModal({
   const [explanationImagePreview, setExplanationImagePreview] = useState<
     string | null
   >(null);
-  const [tags, setTags] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [difficulty, setDifficulty] = useState(3);
   const [errors, setErrors] = useState<string[]>([]);
@@ -120,7 +119,6 @@ export default function EditQuestionModal({
 
       setExplanation(question.explanation?.text || "");
       setExplanationImagePreview(question.explanation?.image || null);
-      setTags(question.tags?.join(", ") || "");
 
       // Handle both old single category and new multiple categories
       if (question.categories && Array.isArray(question.categories)) {
@@ -273,10 +271,6 @@ export default function EditQuestionModal({
           formData.append("explanationImage", explanationImage);
         }
 
-        if (tags.trim()) {
-          formData.append("tags", tags);
-        }
-
         formData.append("categories", JSON.stringify(selectedCategories));
         formData.append("difficulty", difficulty.toString());
 
@@ -305,16 +299,6 @@ export default function EditQuestionModal({
 
         if (explanation !== question.explanation?.text) {
           updateData.explanation = { text: explanation };
-        }
-
-        const newTags = tags.trim()
-          ? tags
-              .split(",")
-              .map((t: string) => t.trim())
-              .filter(Boolean)
-          : [];
-        if (JSON.stringify(newTags) !== JSON.stringify(question.tags)) {
-          updateData.tags = newTags;
         }
 
         // Compare categories (handle both old and new format)
@@ -524,20 +508,6 @@ export default function EditQuestionModal({
                 className="hidden"
               />
             </div>
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Tags (Optional)
-            </label>
-            <Input
-              type="text"
-              placeholder="mathematics, algebra, equations (comma-separated)"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              className="w-full"
-            />
           </div>
 
           {/* Category and Difficulty */}
