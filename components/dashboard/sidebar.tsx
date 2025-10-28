@@ -33,7 +33,7 @@ export default function Sidebar() {
 
   const handleLogout = () => {
     localStorage.removeItem("isAuthenticated");
-    localStorage.removeItem("adminName");
+    localStorage.removeItem("userName");
     router.push("/");
     setLogoutDialogOpen(false);
   };

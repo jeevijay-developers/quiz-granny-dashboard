@@ -33,14 +33,14 @@ export default function UsersPage() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const adminId = localStorage.getItem("adminId");
+      const userId = localStorage.getItem("userId");
 
-      if (!adminId) {
+      if (!userId) {
         toast.error("Admin authentication required");
         return;
       }
 
-      const data = await getAllUsers(adminId);
+      const data = await getAllUsers(userId);
       setUsers(data);
     } catch (err) {
       console.error("Error loading users:", err);
@@ -58,14 +58,14 @@ export default function UsersPage() {
   const handleDelete = async (id) => {
     try {
       setDeleting(id);
-      const adminId = localStorage.getItem("adminId");
+      const userId = localStorage.getItem("userId");
 
-      if (!adminId) {
+      if (!userId) {
         toast.error("Admin authentication required");
         return;
       }
 
-      await deleteUser(id, adminId);
+      await deleteUser(id, userId);
       setUsers(users.filter((u) => u._id !== id));
       setDeleteDialogOpen(false);
       setUserToDelete(null);

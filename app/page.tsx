@@ -39,9 +39,9 @@ export default function LoginPage() {
       if (response.user) {
         // Store user data in localStorage
         localStorage.setItem("isAuthenticated", "true");
-        localStorage.setItem("adminId", response.user._id);
-        localStorage.setItem("adminName", response.user.username);
-        localStorage.setItem("adminEmail", response.user.email);
+        localStorage.setItem("userId", response.user._id);
+        localStorage.setItem("userName", response.user.username);
+        localStorage.setItem("userEmail", response.user.email);
         localStorage.setItem("userRole", response.user.role);
 
         toast.success("Login successful!");

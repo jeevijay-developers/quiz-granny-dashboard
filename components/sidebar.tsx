@@ -39,9 +39,9 @@ export function Sidebar() {
 
   const handleLogout = () => {
     localStorage.removeItem("isAuthenticated");
-    localStorage.removeItem("adminName");
-    localStorage.removeItem("adminId");
-    localStorage.removeItem("adminEmail");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("userEmail");
     localStorage.removeItem("userRole");
     router.push("/");
   };

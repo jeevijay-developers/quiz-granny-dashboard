@@ -67,9 +67,9 @@ export default function AddUserModal({
 
     try {
       // Get admin ID from localStorage
-      const adminId = localStorage.getItem("adminId");
+      const userId = localStorage.getItem("userId");
 
-      if (!adminId) {
+      if (!userId) {
         toast.error("Admin authentication required");
         setIsSubmitting(false);
         return;
@@ -82,7 +82,7 @@ export default function AddUserModal({
           password: password.trim(),
           role,
         },
-        adminId
+        userId
       );
 
       toast.success("User created successfully!");

@@ -12,6 +12,7 @@ import {
   createQuestion,
   createQuestionWithFiles,
   getAllCategories,
+  getUserById,
 } from "@/lib/server";
 import toast from "react-hot-toast";
 
@@ -24,6 +25,7 @@ interface QuestionFormData {
     image: File | null;
     imagePreview: string | null;
   }>;
+  createdBy: string;
   correctAnswer: number;
   difficulty: number;
   categories: string[];
@@ -47,6 +49,7 @@ export default function CreateQuestionsPage() {
       { text: "", image: null, imagePreview: null },
     ],
     correctAnswer: 0,
+    createdBy: "",
     difficulty: 3,
     categories: [],
   });
@@ -210,6 +213,14 @@ export default function CreateQuestionsPage() {
       return;
     }
 
+    const userId = window.localStorage.getItem("userId");
+    if (!userId) {
+      toast.error("User not logged in");
+      setIsSubmitting(false);
+      return;
+    }
+    formData.createdBy = userId;
+
     if (formData.categories.length === 0) {
       toast.error("Please select at least one category");
       setIsSubmitting(false);
@@ -225,7 +236,7 @@ export default function CreateQuestionsPage() {
       if (hasFiles) {
         // Use FormData for multipart/form-data
         const formDataToSend = new FormData();
-
+        formDataToSend.append("createdBy", formData.createdBy);
         // Add title text and image
         formDataToSend.append("titleText", formData.question);
         if (formData.questionImage) {
@@ -250,7 +261,7 @@ export default function CreateQuestionsPage() {
           JSON.stringify(formData.categories)
         );
         formDataToSend.append("difficulty", formData.difficulty.toString());
-
+        console.log("Ful Data", formData);
         await createQuestionWithFiles(formDataToSend);
       } else {
         // Use JSON for application/json
@@ -288,6 +299,7 @@ export default function CreateQuestionsPage() {
           { text: "", image: null, imagePreview: null },
           { text: "", image: null, imagePreview: null },
         ],
+        createdBy: "",
         correctAnswer: 0,
         difficulty: 3,
         categories: [],

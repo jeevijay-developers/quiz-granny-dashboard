@@ -33,6 +33,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import { userRole } from "@/lib/server";
+
 export default function AllQuestionsPage() {
   const router = useRouter();
   const [questions, setQuestions] = useState([]);
@@ -288,11 +290,16 @@ export default function AllQuestionsPage() {
                     Correct Answer
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
-                    Created
+                    Created By
                   </th>
-                  <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">
-                    Actions
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
+                    Created At
                   </th>
+                  {userRole() === "admin" && (
+                    <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">
+                      Actions
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -371,36 +378,43 @@ export default function AllQuestionsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-muted-foreground">
-                        {new Date(question.createdAt).toLocaleDateString()}
+                        {question.createdBy?.username || "Unknown"}
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(question)}
-                          className="flex items-center gap-1 hover:bg-gray-800/10"
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteClick(question)}
-                          disabled={deleting === question._id}
-                          className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          {deleting === question._id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
-                          )}
-                          Delete
-                        </Button>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(question.createdAt).toLocaleDateString()}
                       </div>
                     </td>
+                    {userRole() === "admin" && (
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(question)}
+                            className="flex items-center gap-1 hover:bg-gray-800/10"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteClick(question)}
+                            disabled={deleting === question._id}
+                            className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            {deleting === question._id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
