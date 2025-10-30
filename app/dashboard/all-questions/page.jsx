@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,6 +13,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Upload,
+  Download,
 } from "lucide-react";
 import { FcApproval } from "react-icons/fc";
 import { MdPending } from "react-icons/md";
@@ -22,6 +24,8 @@ import {
   getAllCategories,
   getQuestionsByDateRange,
   toggleQuestionApproval,
+  bulkUploadQuestions,
+  exportQuestions,
 } from "@/lib/server";
 import toast from "react-hot-toast";
 import EditQuestionModal from "@/components/dashboard/edit-question-modal";
@@ -35,6 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
 
 import { userRole } from "@/lib/server";
 
@@ -55,6 +60,12 @@ export default function AllQuestionsPage() {
   const [categories, setCategories] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [togglingApproval, setTogglingApproval] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importStats, setImportStats] = useState({ processed: 0, total: 0 });
+  const fileInputRef = useRef(null);
   const questionsPerPage = 20;
 
   useEffect(() => {
@@ -261,6 +272,145 @@ export default function AllQuestionsPage() {
     }
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (
+      !file.name.endsWith(".csv") &&
+      !file.name.endsWith(".xlsx") &&
+      !file.name.endsWith(".xls")
+    ) {
+      toast.error("Please upload a valid CSV or Excel file");
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setImportProgress(0);
+      setImportStats({ processed: 0, total: 0 });
+      setImportDialogOpen(true);
+
+      // Simulate progress while uploading
+      const progressInterval = setInterval(() => {
+        setImportProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
+      const result = await bulkUploadQuestions(file);
+
+      clearInterval(progressInterval);
+
+      if (result.success) {
+        const { summary } = result;
+
+        // Update final progress
+        setImportStats({ processed: summary.total, total: summary.total });
+        setImportProgress(100);
+
+        // Wait a moment to show 100% before closing
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        setImportDialogOpen(false);
+
+        // Show detailed summary
+        if (summary.successful > 0) {
+          toast.success(
+            `Import completed!\n✓ ${summary.successful} imported\n${
+              summary.failed > 0 ? `✗ ${summary.failed} failed\n` : ""
+            }${summary.skipped > 0 ? `⊝ ${summary.skipped} skipped` : ""}`,
+            { duration: 5000 }
+          );
+        } else {
+          toast.error(
+            `Import completed with errors:\n✗ ${summary.failed} failed\n⊝ ${summary.skipped} skipped`,
+            { duration: 5000 }
+          );
+        }
+
+        // Log detailed results to console for debugging
+        if (summary.failed > 0 || summary.skipped > 0) {
+          console.group("Import Results");
+          if (result.results.failed.length > 0) {
+            console.log("Failed:", result.results.failed);
+          }
+          if (result.results.skipped.length > 0) {
+            console.log("Skipped:", result.results.skipped);
+          }
+          console.groupEnd();
+        }
+
+        // Reload questions to show newly imported ones
+        if (summary.successful > 0) {
+          await loadQuestions();
+        }
+      }
+
+      // Reset file input
+      if (event.target) {
+        event.target.value = "";
+      }
+    } catch (err) {
+      console.error("Error importing questions:", err);
+      setImportDialogOpen(false);
+      toast.error(
+        err.response?.data?.message ||
+          "Failed to import questions. Please check the file format."
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleExportClick = async () => {
+    try {
+      setExporting(true);
+      const userId = window.localStorage.getItem("userId");
+
+      if (!userId) {
+        toast.error("User not logged in");
+        return;
+      }
+
+      toast.loading("Preparing export...", { id: "export" });
+
+      const blob = await exportQuestions(userId);
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `questions_export_${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Questions exported successfully!", { id: "export" });
+    } catch (err) {
+      console.error("Error exporting questions:", err);
+      toast.error(
+        err.response?.data?.error ||
+          "Failed to export questions. Please try again.",
+        { id: "export" }
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -279,12 +429,53 @@ export default function AllQuestionsPage() {
             {filteredQuestions.length} of {questions.length} questions
           </p>
         </div>
-        <Link href="/dashboard/questions">
-          <Button className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Create Question
+        <div className="flex items-center gap-3">
+          {/* Hidden file input for import */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+          />
+
+          <Button
+            variant="outline"
+            onClick={handleImportClick}
+            disabled={uploading}
+            className="flex items-center gap-2"
+          >
+            {uploading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4" />
+            )}
+            Import CSV
           </Button>
-        </Link>
+
+          {userRole() === "admin" && (
+            <Button
+              variant="outline"
+              onClick={handleExportClick}
+              disabled={exporting}
+              className="flex items-center gap-2"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Export CSV
+            </Button>
+          )}
+
+          <Link href="/dashboard/questions">
+            <Button className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Create Question
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -726,6 +917,40 @@ export default function AllQuestionsPage() {
               {deleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Import Progress Dialog */}
+      <AlertDialog open={importDialogOpen} onOpenChange={() => {}}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Upload className="w-5 h-5 animate-pulse" />
+              Importing Questions
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Please wait while we process your questions...
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Progress</span>
+                <span className="font-medium">
+                  {Math.round(importProgress)}%
+                </span>
+              </div>
+              <Progress value={importProgress} className="h-3" />
+            </div>
+            {importStats.total > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Processed</span>
+                <span className="font-medium">
+                  {importStats.processed} / {importStats.total} questions
+                </span>
+              </div>
+            )}
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </div>

@@ -84,9 +84,7 @@ export default function LoginPage() {
             {/* Login Form */}
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Email or Username
-                </label>
+                <label className="block text-sm font-medium mb-2">Email</label>
                 <Input
                   type="text"
                   placeholder="Enter your email"

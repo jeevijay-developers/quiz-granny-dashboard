@@ -30,11 +30,14 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
 
   useEffect(() => {
-    // Get user role from localStorage
+    // Get user role and name from localStorage
     const role = localStorage.getItem("userRole");
+    const name = localStorage.getItem("userName");
     setUserRole(role);
+    setUserName(name);
   }, []);
 
   const handleLogout = () => {
@@ -118,6 +121,11 @@ export function Sidebar() {
             <p className="text-xs text-sidebar-foreground/60">
               Admin Dashboard
             </p>
+            {userName && (
+              <p className="text-sm text-sidebar-foreground mt-2 font-medium">
+                Welcome, {userName}
+              </p>
+            )}
           </div>
 
           {/* Navigation */}

@@ -25,6 +25,9 @@ interface QuestionFormData {
     image: File | null;
     imagePreview: string | null;
   }>;
+  explanation: string;
+  explanationImage: File | null;
+  explanationImagePreview: string | null;
   createdBy: string;
   correctAnswer: number;
   difficulty: number;
@@ -48,6 +51,9 @@ export default function CreateQuestionsPage() {
       { text: "", image: null, imagePreview: null },
       { text: "", image: null, imagePreview: null },
     ],
+    explanation: "",
+    explanationImage: null,
+    explanationImagePreview: null,
     correctAnswer: 0,
     createdBy: "",
     difficulty: 3,
@@ -133,6 +139,37 @@ export default function CreateQuestionsPage() {
       ...formData,
       questionImage: null,
       questionImagePreview: null,
+    });
+  };
+
+  const handleExplanationChange = (
+    e: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    setFormData({ ...formData, explanation: e.target.value });
+  };
+
+  const handleExplanationImageUpload = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFormData({
+          ...formData,
+          explanationImage: file,
+          explanationImagePreview: event.target?.result as string,
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveExplanationImage = () => {
+    setFormData({
+      ...formData,
+      explanationImage: null,
+      explanationImagePreview: null,
     });
   };
 
@@ -231,6 +268,7 @@ export default function CreateQuestionsPage() {
       // Check if there are any files to upload
       const hasFiles =
         formData.questionImage ||
+        formData.explanationImage ||
         formData.options.some((opt) => opt.image !== null);
 
       if (hasFiles) {
@@ -250,6 +288,12 @@ export default function CreateQuestionsPage() {
             formDataToSend.append(`optionImage${index}`, option.image);
           }
         });
+
+        // Add explanation text and image
+        formDataToSend.append("explanationText", formData.explanation);
+        if (formData.explanationImage) {
+          formDataToSend.append("explanationImage", formData.explanationImage);
+        }
 
         // Add other fields
         formDataToSend.append(
@@ -276,7 +320,7 @@ export default function CreateQuestionsPage() {
           })),
           correctAnswer: formData.correctAnswer,
           explanation: {
-            text: "",
+            text: formData.explanation,
             image: "",
           },
           categories: formData.categories,
@@ -299,6 +343,9 @@ export default function CreateQuestionsPage() {
           { text: "", image: null, imagePreview: null },
           { text: "", image: null, imagePreview: null },
         ],
+        explanation: "",
+        explanationImage: null,
+        explanationImagePreview: null,
         createdBy: "",
         correctAnswer: 0,
         difficulty: 3,
@@ -565,6 +612,63 @@ export default function CreateQuestionsPage() {
               <Plus className="w-4 h-4" />
               Add Option
             </Button>
+          </div>
+
+          {/* Explanation */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Explanation (Optional)
+            </label>
+
+            {/* Explanation Image Preview */}
+            {formData.explanationImagePreview && (
+              <div className="mb-3 relative inline-block">
+                <img
+                  src={formData.explanationImagePreview}
+                  alt="Explanation preview"
+                  className="w-32 h-32 rounded object-cover border border-border"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                  onClick={handleRemoveExplanationImage}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <textarea
+                value={formData.explanation}
+                onChange={handleExplanationChange}
+                placeholder="Enter explanation for the correct answer..."
+                className="flex-1 px-4 py-3 border border-border rounded-lg bg-input text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                rows={3}
+              />
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-full gap-2 hover:bg-gray-900/10"
+                  onClick={() =>
+                    document.getElementById("explanation-image")?.click()
+                  }
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload Image
+                </Button>
+                <input
+                  id="explanation-image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleExplanationImageUpload}
+                  className="hidden"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Submit Button */}
